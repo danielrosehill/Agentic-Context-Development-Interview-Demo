@@ -17,12 +17,38 @@ The primary goal of this project is to illustrate how an agent-driven workflow c
 
 ## Screenshots
 
-![alt text](screenshots/1.png)
+### Step 1: AI agent asks you questions according to your preferred area of focus
 
-![alt text](screenshots/2.png)
+![alt text](screenshots/2/1.png)
 
-![alt text](screenshots/3.png)
+### Step 2: Sit back and talk about yourself for a while
 
+The bot asked me if I could wake up with one magic power in the morning what would it be? This is the SFW version:
+
+![alt text](screenshots/2/2.png)
+
+### When you're done, click on 'End Interview' and your interview with the bot is done:
+
+![alt text](screenshots/2/3.png)
+
+### The chat transcript is then parsed, mined for contextual data, and reformatted for ingress to a RAG pipeline / vector DB
+
+(Behind the scenes)
+
+### You get your context data out the other end!
+
+![alt text](screenshots/2/4.png)
+
+### Download and load into an agent for personalised LLM!
+
+The reformatted contextual data snippets from the interviews are provided as downloadable markdown files. Markdown was chosen for its compact nature, its versatility, and its ubiquitous presence in the world of large language models. 
+
+![alt text](screenshots/2/5.png)
+
+These marked on files can then be aggregated, uploaded, or added to a RAG pipeline and added to an agent for personalized large language model (LLM) experiences. 
+
+An iterative workflow is envisioned whereby the user engages in a few interviews at a time, feeding these into vector database storage and progressively increasing the pool of personal context data available to the tools being worked with. 
+ 
 ## About
 
 This project was developed through collaboration between [Daniel Rosehill](https://danielrosehill.com) and Claude (Anthropic). It serves as a practical demonstration of how AI systems can be designed to actively participate in context generation and enhancement, leading to more effective and personalized LLM experiences.
