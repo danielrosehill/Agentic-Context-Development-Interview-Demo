@@ -1,75 +1,80 @@
 import streamlit as st
 import openai
 import json
+import os
 from datetime import datetime
 
 # Page configuration
 st.set_page_config(
-    page_title="Agent Interview Context Generation Demo",
+    page_title="Agentic Context Development Interview",
     layout="wide"
 )
 
-# Custom CSS for chat bubbles and Font Awesome
+# Custom CSS for chat bubbles, badges, and Font Awesome
 st.markdown("""
 <style>
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
-.chat-bubble {
-    padding: 15px;
-    border-radius: 15px;
-    margin: 5px 0;
-    max-width: 80%;
-    position: relative;
-}
 
-.bot-bubble {
-    background-color: #F0F2F6;
-    margin-right: auto;
-    margin-left: 10px;
-    border-bottom-left-radius: 5px;
-}
-
-.user-bubble {
-    background-color: #4CAF50;
-    color: white;
-    margin-left: auto;
-    margin-right: 10px;
-    border-bottom-right-radius: 5px;
-}
-
-.chat-container {
+/* Control buttons */
+.control-buttons {
     display: flex;
-    flex-direction: column;
     gap: 10px;
-    padding: 10px;
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
 }
 
-.stTextArea textarea {
+.stButton > button {
     border-radius: 20px;
-    padding: 10px 15px;
-    font-size: 16px;
+    padding: 10px 20px;
+    font-weight: 500;
 }
 
-.stButton button {
-    border-radius: 20px;
-    padding: 5px 20px;
+/* Sidebar styling */
+.sidebar .stRadio > label {
+    font-weight: bold;
+    margin-bottom: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state variables
+# Initialize session state
 if 'messages' not in st.session_state:
     st.session_state.messages = []
+if 'interview_started' not in st.session_state:
+    st.session_state.interview_started = False
 if 'interview_complete' not in st.session_state:
     st.session_state.interview_complete = False
 if 'context_data' not in st.session_state:
     st.session_state.context_data = ""
-if 'interview_started' not in st.session_state:
-    st.session_state.interview_started = False
 if 'context_focus' not in st.session_state:
     st.session_state.context_focus = None
+if 'use_stored_key' not in st.session_state:
+    st.session_state.use_stored_key = True
+if 'interview_mode' not in st.session_state:
+    st.session_state.interview_mode = "AMA (Ask Me Anything)"
+
+def get_config_dir():
+    """Get the configuration directory for storing API key."""
+    if os.name == 'nt':  # Windows
+        config_dir = os.path.join(os.environ['APPDATA'], 'AgenticContext')
+    else:  # Unix/Linux/Mac
+        config_dir = os.path.join(os.path.expanduser('~'), '.config', 'agentic_context')
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
+
+def save_api_key(api_key):
+    """Save API key to configuration file."""
+    config_path = os.path.join(get_config_dir(), 'config.json')
+    with open(config_path, 'w') as f:
+        json.dump({'api_key': api_key}, f)
+
+def load_api_key():
+    """Load API key from configuration file."""
+    config_path = os.path.join(get_config_dir(), 'config.json')
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f).get('api_key')
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
 def get_random_question(api_key, focus_area=None):
     """Get a random question from OpenAI based on optional focus area."""
@@ -120,31 +125,187 @@ def extract_context(api_key, conversation):
     except Exception as e:
         return f"Error: {str(e)}"
 
-# Sidebar for API key and controls
+def generate_markdown_filename(context_focus):
+    """Generate a filename for the markdown export."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    subject = context_focus if context_focus else "general"
+    return f"context_{subject}_{timestamp}.md"
+
+# Sidebar for settings
 with st.sidebar:
     st.title("Settings")
-    api_key = st.text_input("Enter OpenAI API Key", type="password")
     
-    if st.button("Clear/Reset"):
+    # API Key Management
+    st.subheader("API Key")
+    stored_key = load_api_key()
+    
+    if stored_key:
+        st.session_state.use_stored_key = st.checkbox("Use stored API key", value=st.session_state.use_stored_key)
+    
+    if stored_key and st.session_state.use_stored_key:
+        api_key = stored_key
+        st.success("Using stored API key")
+    else:
+        api_key = st.text_input("Enter OpenAI API Key", type="password")
+        if api_key:
+            if st.button("Save API Key"):
+                save_api_key(api_key)
+                st.success("API key saved successfully!")
+                st.rerun()
+    
+    st.divider()
+    
+    # Interview Settings
+    st.subheader("Interview Settings")
+    st.session_state.interview_mode = st.radio(
+        "Interview Mode",
+        ["AMA (Ask Me Anything)", "Subject Restricted"],
+        index=0 if st.session_state.interview_mode == "AMA (Ask Me Anything)" else 1
+    )
+    
+    if st.session_state.interview_mode == "Subject Restricted":
+        predefined_subjects = ["General", "Professional Background", "Technical Skills", "Education", "Interests"]
+        selected_subject = st.selectbox("Select Subject Focus", predefined_subjects)
+        
+        use_custom = st.checkbox("Use Custom Subject")
+        if use_custom:
+            custom_subject = st.text_input("Enter Custom Subject")
+            new_subject = custom_subject if custom_subject else None
+        else:
+            new_subject = selected_subject.lower() if selected_subject != "General" else None
+            
+        # Add Update Subject button
+        if st.button("Update Subject", type="primary"):
+            st.session_state.context_focus = new_subject
+            st.session_state.messages = []
+            st.session_state.context_data = ""
+            st.session_state.interview_started = True
+            st.session_state.interview_complete = False
+            question = get_random_question(api_key, new_subject)
+            if question:
+                st.session_state.messages.append(f"Q: {question}")
+                st.rerun()
+    else:
+        st.session_state.context_focus = None
+
+    # Add a clear button to reset everything
+    if st.button("Clear All", type="secondary"):
         st.session_state.messages = []
+        st.session_state.interview_started = False
         st.session_state.interview_complete = False
         st.session_state.context_data = ""
-        st.session_state.interview_started = False
         st.session_state.context_focus = None
         st.rerun()
 
 # Main content
-st.title("Agent Interview Context Generation Demo")
+st.title("Agentic Context Development Interview")
+
+# GitHub badges
 st.markdown("""
-This project demonstrates how AI agents can proactively gather and generate rich contextual data 
-through intelligent interviewing. By focusing on specific areas of interest, the agent builds a comprehensive 
-understanding that enhances AI-human interactions and enables more personalized experiences.
+<div style="text-align: center; margin-bottom: 20px;">
+    <a href="https://github.com/danielrosehill" class="github-badge" target="_blank">
+        <i class="fab fa-github"></i> Author's GitHub
+    </a>
+    <a href="https://github.com/danielrosehill/Agentic-Context-Development-Interview-Demo" class="github-badge" target="_blank">
+        <i class="fab fa-github"></i> Project Repository
+    </a>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+This application provides a simple interface for using a large language model to conduct context-generating interviews. 
+It creates context snippets that can be fed into vector storage for personalized LLM inference. You can use a data pipeline 
+to provide your data into the vector database of your choice.
 """)
 
 # Create tabs for different sections
-tab1, tab2, tab3, tab4 = st.tabs(["Instructions", "Interview", "Gallery", "Generated Context"])
+tab1, tab2, tab3, tab4 = st.tabs(["Interview", "Generated Context", "Instructions", "Gallery"])
 
 with tab1:
+    # Control buttons at the top
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Start New Interview", key="start_new", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.context_data = ""
+            st.session_state.interview_started = True
+            st.session_state.interview_complete = False
+            question = get_random_question(api_key, st.session_state.context_focus)
+            if question:
+                st.session_state.messages.append(f"Q: {question}")
+                st.rerun()
+            else:
+                st.error("Failed to generate question. Please check your API key.")
+
+    with col2:
+        if st.button("End Interview", key="end", use_container_width=True):
+            if st.session_state.messages:
+                st.session_state.interview_complete = True
+                st.session_state.context_data = extract_context(api_key, st.session_state.messages)
+                st.rerun()
+
+    with col3:
+        if st.button("Export Conversation", key="export", use_container_width=True):
+            if st.session_state.messages:
+                filename = generate_markdown_filename(st.session_state.context_focus)
+                st.download_button(
+                    label="Download Chat",
+                    data=st.session_state.context_data,
+                    file_name=filename,
+                    mime="text/markdown",
+                    use_container_width=True
+                )
+
+    # Chat messages
+    for msg in st.session_state.messages:
+        is_bot = msg.startswith('Q:')
+        if is_bot:
+            with st.chat_message("assistant", avatar="🤖"):
+                st.write(msg[2:])  # Remove the 'Q: ' prefix
+        else:
+            with st.chat_message("user", avatar="👤"):
+                st.write(msg)
+
+    # Input area
+    if api_key and st.session_state.interview_started and not st.session_state.interview_complete:
+        prompt = st.chat_input("Type your response here...")
+        
+        if prompt:
+            st.session_state.messages.append(prompt)
+            question = get_random_question(api_key, st.session_state.context_focus)
+            if question:
+                st.session_state.messages.append(f"Q: {question}")
+                st.rerun()
+            else:
+                st.error("Failed to generate question. Please check your API key.")
+
+with tab4:
+    st.header("Feature Gallery")
+    st.markdown("### Interactive Interview Process")
+    st.image("screenshots/1.png", use_column_width=True)
+    st.markdown("### Context Focus Selection")
+    st.image("screenshots/2.png", use_column_width=True)
+    st.markdown("### Generated Context Summary")
+    st.image("screenshots/3.png", use_column_width=True)
+
+with tab2:
+    if st.session_state.interview_complete and st.session_state.context_data:
+        st.header("Generated Context")
+        st.markdown(st.session_state.context_data)
+        
+        # Download button for markdown
+        if st.button("Download as Markdown"):
+            filename = generate_markdown_filename(st.session_state.context_focus)
+            st.download_button(
+                label="Click to Download",
+                data=st.session_state.context_data,
+                file_name=filename,
+                mime="text/markdown"
+            )
+    else:
+        st.info("Complete the interview to generate your context summary.")
+
+with tab3:
     st.header("How it Works")
     st.markdown("""
     This application helps gather and extract contextual information about you through an interactive interview process.
@@ -155,19 +316,20 @@ with tab1:
     
     ### Process:
     1. Enter your OpenAI API key in the sidebar
-    2. Choose your preferred context focus area
-    3. Click the "Start Interview" button in the Interview tab
-    4. The AI interviewer will ask targeted questions based on your chosen focus
+    2. Choose your preferred interview subject
+    3. Click the "Start Interview" button
+    4. The AI interviewer will ask targeted questions based on your chosen subject
     5. Answer each question naturally - you can type or use voice input
     6. Click "Submit Answer" after each response
-    7. Continue the conversation until you're ready to end
-    8. Click "End Interview" to generate your context summary
+    7. You can change the interview subject at any time
+    8. Click "End Interview" when you're ready to finish
     9. Review the extracted context and export it as needed
     
     ### Features:
-    - **Focus Areas**: Choose to focus on specific aspects like professional background, technical skills, or keep it general
+    - **Interview Subjects**: Choose to focus on specific aspects like professional background, technical skills, or keep it general
+    - **Dynamic Subject Changes**: Change the interview focus at any time during the conversation
     - **Voice Input**: Use Chrome's built-in speech-to-text by clicking the microphone icon
-    - **Targeted Questions**: The AI asks questions relevant to your chosen focus area
+    - **Targeted Questions**: The AI asks questions relevant to your chosen subject
     - **Context Extraction**: Automatically organizes your information into a structured summary
     - **Export Options**: Copy or download your context data in markdown format
     
@@ -175,122 +337,6 @@ with tab1:
     - Provide detailed, honest answers for better context extraction
     - Use voice input to make the process faster and more natural
     - Take your time with each response
+    - Feel free to change subjects to cover different aspects of your background
     - You can reset and start over at any time using the Clear/Reset button
     """)
-
-with tab2:
-    # Create two columns for the main interface
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        st.subheader("Conversation")
-        # Display conversation history with chat bubbles
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        for msg in st.session_state.messages:
-            is_bot = msg.startswith('Q:')
-            bubble_class = "bot-bubble" if is_bot else "user-bubble"
-            message_content = msg[3:] if is_bot else msg
-            bot_icon = '<i class="fas fa-robot" style="margin-right: 8px;"></i>' if is_bot else ''
-            st.markdown(
-                f'<div class="chat-bubble {bubble_class}">{bot_icon}{message_content}</div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col2:
-        st.subheader("Your Response")
-        # Add microphone icon and voice input instructions
-        st.markdown("""
-        💡 **Voice Input Tip**: 
-        - Click the microphone icon in Chrome
-        - Or use built-in speech-to-text
-        """)
-        
-        # Show interview interface
-        if api_key:
-            if not st.session_state.interview_started and not st.session_state.interview_complete:
-                # Context focus selection
-                if st.session_state.context_focus is None:
-                    st.write("Before we begin, would you like to focus on a specific area or keep the questions general?")
-                    focus_options = ["general", "professional background", "personal interests", "technical skills", "life experiences"]
-                    selected_focus = st.selectbox("Choose focus area:", focus_options)
-                    if st.button("Set Focus"):
-                        st.session_state.context_focus = selected_focus
-                        st.rerun()
-                else:
-                    if st.button("Start Interview", type="primary", use_container_width=True):
-                        st.session_state.interview_started = True
-                        question = get_random_question(api_key, st.session_state.context_focus)
-                        st.session_state.messages.append(f"Q: {question}")
-                        st.rerun()
-            
-            elif st.session_state.interview_started and not st.session_state.interview_complete:
-                # Get last message
-                last_message = st.session_state.messages[-1]
-                
-                # If last message was an answer, get next question
-                if not last_message.startswith('Q:'):
-                    question = get_random_question(api_key, st.session_state.context_focus)
-                    st.session_state.messages.append(f"Q: {question}")
-                    st.rerun()
-                
-                # User input
-                user_answer = st.text_area("Your answer:", height=100)
-                
-                # Submit answer button
-                if st.button("Submit Answer"):
-                    if user_answer:
-                        st.session_state.messages.append(user_answer)
-                        st.rerun()
-                
-                # End interview button
-                if st.button("End Interview"):
-                    if len(st.session_state.messages) > 1:  # Ensure there's at least one Q&A pair
-                        st.session_state.interview_complete = True
-                        # Extract context
-                        st.session_state.context_data = extract_context(api_key, st.session_state.messages)
-                        st.rerun()
-        else:
-            st.warning("Please enter your OpenAI API key in the sidebar to begin.")
-
-with tab3:
-    st.header("Feature Gallery")
-    st.markdown("### Interactive Interview Process")
-    st.image("screenshots/1.png", use_column_width=True)
-    st.markdown("### Context Focus Selection")
-    st.image("screenshots/2.png", use_column_width=True)
-    st.markdown("### Generated Context Summary")
-    st.image("screenshots/3.png", use_column_width=True)
-
-with tab4:
-    if st.session_state.interview_complete and st.session_state.context_data:
-        st.header("Generated Context")
-        st.markdown("""
-        Below is the AI-generated context summary based on your interview responses. 
-        This structured data can be used to enhance future AI interactions and create 
-        more personalized experiences.
-        """)
-        st.markdown(st.session_state.context_data)
-        
-        # Export options in columns
-        st.subheader("Export Options")
-        col3, col4 = st.columns(2)
-        with col3:
-            if st.button("Copy to Clipboard", type="secondary", use_container_width=True):
-                st.write("Context copied to clipboard!")
-                st.code(st.session_state.context_data)
-        
-        with col4:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"context_data_{timestamp}.md"
-            with open(filename, "w") as f:
-                f.write(st.session_state.context_data)
-            st.download_button(
-                label="Download as Markdown",
-                data=st.session_state.context_data,
-                file_name=filename,
-                mime="text/markdown",
-                use_container_width=True
-            )
-    else:
-        st.info("Complete the interview to generate your context summary.")
