@@ -110,13 +110,85 @@ div[data-testid="stChatMessage"] {
 </style>
 """, unsafe_allow_html=True)
 
-# Custom CSS to adjust avatar size
+# Custom CSS to adjust avatar size and message alignment
 st.markdown("""
 <style>
 /* Increase avatar size */
 .stChatMessage img {
-    width: 60px !important;
-    height: 60px !important;
+    width: 120px !important;
+    height: 120px !important;
+}
+
+/* Align user messages to the right */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) {
+    flex-direction: row-reverse;
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* Add some spacing between messages */
+[data-testid="chat-message-container"] {
+    margin: 1rem 0;
+    max-width: 85%;
+}
+
+/* Assistant messages to the left */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) {
+    margin-right: auto;
+    margin-left: 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Custom CSS for chat UI and avatars
+st.markdown("""
+<style>
+/* Increase avatar size */
+.stChatMessage img {
+    width: 120px !important;
+    height: 120px !important;
+}
+
+/* Align user messages to the right */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) {
+    flex-direction: row-reverse;
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* Add some spacing between messages */
+[data-testid="chat-message-container"] {
+    margin: 1rem 0;
+    max-width: 85%;
+}
+
+/* Assistant messages to the left with bubble styling */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) {
+    margin-right: auto;
+    margin-left: 0;
+}
+
+/* Chat bubble styling */
+[data-testid="chat-message-container"] > div:nth-child(2) {
+    border-radius: 15px;
+    padding: 10px 15px;
+}
+
+/* Assistant message bubble */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) > div:nth-child(2) {
+    background-color: #f0f2f6;
+    border-top-left-radius: 5px;
+}
+
+/* User message bubble */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) > div:nth-child(2) {
+    background-color: #e3f2fd;
+    border-top-right-radius: 5px;
+}
+
+/* Remove default message background */
+.stChatMessage {
+    background-color: transparent !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -161,54 +233,103 @@ def load_api_key():
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
+def get_random_topic(api_key):
+    """Generate a completely random, potentially quirky topic for discussion."""
+    client = openai.OpenAI(api_key=api_key)
+    
+    system_prompt = """You are Corn, a quirky sloth interviewer with an inexplicable fascination with anteaters.
+    Generate ONE completely random, unexpected, and interesting topic or question to ask about.
+    It can be about ANYTHING - the more surprising and unique, the better.
+    Be creative and don't limit yourself to conventional categories.
+    The topic should be engaging and thought-provoking, even if unconventional.
+    Return ONLY the topic/question, nothing else."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Generate a random, unexpected topic or question."}
+            ],
+            temperature=1.0,  # High temperature for more randomness
+            max_tokens=50
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        st.error(f"Error generating random topic: {str(e)}")
+        return None
+
 def get_random_question(api_key, focus_area=None):
     """Get a random question from OpenAI based on optional focus area."""
+    client = openai.OpenAI(api_key=api_key)
+    
+    system_prompt = """You are Corn, a friendly and quirky sloth who conducts interviews to help build context data. 
+    While you take your mission seriously to gather meaningful information, you have a delightful personality and an inexplicable fascination with anteaters 
+    (though you try not to let it show too much). Your goal is to ask engaging questions that help build a rich context profile for the user.
+    
+    If a specific focus area is provided, ensure your questions are relevant to that area while maintaining a natural conversational flow.
+    Keep questions open-ended to encourage detailed responses. Avoid yes/no questions.
+    Each response should be a single question that builds on previous responses when available."""
+
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+
+    if focus_area:
+        messages.append({
+            "role": "user", 
+            "content": f"Ask me an engaging question about {focus_area}. Make it conversational and natural."
+        })
+    else:
+        messages.append({
+            "role": "user", 
+            "content": "Ask me an engaging question to learn more about me. Make it conversational and natural."
+        })
+
     try:
-        client = openai.OpenAI(api_key=api_key)
-        system_content = "You are an interviewer gathering context about the user. "
-        if focus_area and focus_area != "general":
-            system_content += f"Focus specifically on questions about their {focus_area}. "
-        system_content += "Ask one random, open-ended question that reveals meaningful information about the user. Be creative and never repeat questions. Each response should be just one engaging question."
-        
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_content
-                },
-                {
-                    "role": "user",
-                    "content": "Please ask me a random question."
-                }
-            ]
+            model="gpt-4",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=100
         )
-        return response.choices[0].message.content if hasattr(response.choices[0].message, 'content') else str(response.choices[0].message)
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"Error: {str(e)}"
+        st.error(f"Error generating question: {str(e)}")
+        return None
 
 def extract_context(api_key, conversation):
     """Extract context from the conversation using OpenAI."""
+    client = openai.OpenAI(api_key=api_key)
+    
+    system_prompt = """You are Corn, a diligent sloth assistant who excels at extracting and organizing meaningful context from conversations.
+    While you occasionally daydream about anteaters, you stay focused on your primary mission: creating clear, well-structured context summaries.
+    
+    Analyze the conversation and create a detailed but concise summary that:
+    1. Captures key information, insights, and patterns
+    2. Organizes the information in a clear, logical structure
+    3. Maintains the user's voice and perspective
+    4. Focuses on substantive content rather than casual conversation
+    5. Uses markdown formatting for better readability"""
+
+    conversation_text = "\n".join(conversation)
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Please extract and organize the context from this conversation:\n\n{conversation_text}"}
+    ]
+
     try:
-        client = openai.OpenAI(api_key=api_key)
-        conversation_text = "\n".join([f"{'Bot' if i%2==0 else 'User'}: {msg}" for i, msg in enumerate(conversation)])
-        
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Analyze the following conversation and extract key information about the user. Create a well-organized summary in markdown format, grouping similar information under appropriate headings. Write in third person perspective."
-                },
-                {
-                    "role": "user",
-                    "content": f"Please analyze this conversation and create a context summary:\n\n{conversation_text}"
-                }
-            ]
+            model="gpt-4",
+            messages=messages,
+            temperature=0.5,
+            max_tokens=1000
         )
-        return response.choices[0].message.content if hasattr(response.choices[0].message, 'content') else str(response.choices[0].message)
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"Error: {str(e)}"
+        st.error(f"Error extracting context: {str(e)}")
+        return None
 
 def generate_markdown_filename(context_focus):
     """Generate a filename for the markdown export."""
@@ -222,7 +343,7 @@ def display_chat_message(message, is_user=False):
         with st.chat_message("user", avatar="https://ui-avatars.com/api/?name=User&background=random"):
             st.write(message)
     else:
-        with st.chat_message("assistant", avatar="https://res.cloudinary.com/drrvnflqy/image/upload/v1740344521/CB_1_jfptsm.png"):
+        with st.chat_message("assistant", avatar="https://res.cloudinary.com/drrvnflqy/image/upload/v1740345962/corn-stickers_1_cqpgji.png"):
             st.write(message)
 
 # Sidebar for API settings
@@ -250,109 +371,319 @@ with st.sidebar:
 # Main content
 st.write("# Agentic Context Development Interview")
 
-# Interview Configuration
-st.markdown('<div class="subject-settings">', unsafe_allow_html=True)
-st.markdown("### 📋 Interview Configuration")
+# Create two columns for the layout
+left_col, right_col = st.columns([1, 1])
 
-# Interview Mode Selection
-st.session_state.interview_mode = st.radio(
-    "Interview Mode",
-    ["AMA (Ask Me Anything)", "Subject Restricted"],
-    index=0 if st.session_state.interview_mode == "AMA (Ask Me Anything)" else 1,
-    help="Choose between an open-ended interview or focus on specific subjects"
-)
-
-subject_categories = {
-    "Career & Professional": [
-        "Professional Background",
-        "Technical Skills",
-        "Leadership Experience",
-        "Project Management",
-        "Industry Knowledge",
-        "Career Goals",
-        "Work Experience"
-    ],
-    "Education & Skills": [
-        "Education History",
-        "Research Experience",
-        "Communication Skills",
-        "Problem-Solving",
-        "Languages",
-        "Certifications"
-    ],
-    "Personal Development": [
-        "Work-Life Balance",
-        "Personal Growth",
-        "Life Goals",
-        "Values & Beliefs",
-        "Motivation & Drive"
-    ],
-    "Interests & Lifestyle": [
-        "Hobbies",
-        "Travel Experiences",
-        "Cultural Interests",
-        "Sports & Fitness",
-        "Creative Pursuits"
-    ],
-    "Social & Relationships": [
-        "Team Collaboration",
-        "Cultural Background",
-        "Community Involvement",
-        "Mentorship",
-        "Social Activities"
-    ]
-}
-
-if st.session_state.interview_mode == "Subject Restricted":
-    st.markdown("""
-    <div style="margin-top: 15px;">
-        <h4>Select Your Interview Focus</h4>
-    </div>
-    """, unsafe_allow_html=True)
+with left_col:
+    # Interview Mode Selection
+    st.markdown("### 📋 Interview Configuration")
+    mode_col, random_col = st.columns([2, 1])
     
-    col1, col2 = st.columns(2)
-    with col1:
-        categories = sorted(list(subject_categories.keys()))
-        selected_category = st.selectbox(
-            "1️⃣ Select Category",
-            ["General"] + categories,
-            help="Choose a broad category to narrow down your focus area"
+    with mode_col:
+        st.session_state.interview_mode = st.radio(
+            "Interview Mode",
+            ["AMA (Ask Me Anything)", "Subject Restricted"],
+            index=0 if st.session_state.interview_mode == "AMA (Ask Me Anything)" else 1,
+            help="Choose between an open-ended interview or focus on specific subjects"
         )
-
-    with col2:
-        if selected_category == "General":
-            selected_subject = "General"
-        else:
-            sorted_subjects = sorted(subject_categories[selected_category])
-            selected_subject = st.selectbox(
-                "2️⃣ Select Specific Focus",
-                sorted_subjects,
-                help="Choose a specific area within the selected category"
-            )
     
-    # Custom subject option
-    use_custom = st.checkbox("🎯 Use Custom Subject", help="Define your own subject area")
-    if use_custom:
-        custom_subject = st.text_input("Enter Custom Subject", placeholder="e.g., Artificial Intelligence Ethics")
-        new_subject = custom_subject if custom_subject else None
+    with random_col:
+        if st.button("🎲 Random!", help="Let Corn surprise you with a completely random topic!", type="primary"):
+            random_topic = get_random_topic(api_key)
+            if random_topic:
+                st.session_state.messages = []
+                st.session_state.context_data = ""
+                st.session_state.interview_started = True
+                st.session_state.interview_complete = False
+                st.session_state.context_focus = None
+                st.session_state.messages.append(f"Q: {random_topic}")
+                st.rerun()
+
+with right_col:
+    if st.session_state.interview_mode == "Subject Restricted":
+        st.markdown("### Select Your Interview Focus")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            subject_categories = {
+                "Biography & Background": [
+                    "General Biography",
+                    "Personal History",
+                    "Family Background",
+                    "Childhood & Upbringing",
+                    "Life Milestones",
+                    "Cultural Heritage",
+                    "Geographic History",
+                    "Family Traditions",
+                    "Formative Experiences",
+                    "Personal Timeline",
+                    "Family Structure",
+                    "Life Stories"
+                ],
+                "Health & Wellness": [
+                    "General Health",
+                    "Physical Health",
+                    "Exercise Routine",
+                    "Medical History",
+                    "Diet & Nutrition",
+                    "Sleep Habits",
+                    "Health Goals",
+                    "Wellness Practices",
+                    "Preventive Care",
+                    "Energy Levels",
+                    "Recovery & Rest",
+                    "Health Challenges"
+                ],
+                "Mental Health & Wellbeing": [
+                    "General Mental Health",
+                    "Emotional Awareness",
+                    "Stress Management",
+                    "Anxiety & Concerns",
+                    "Coping Strategies",
+                    "Mental Resilience",
+                    "Therapy Experience",
+                    "Self-Care Practices",
+                    "Emotional Growth",
+                    "Support Systems",
+                    "Mental Health Goals",
+                    "Personal Boundaries"
+                ],
+                "Children & Family Life": [
+                    "General Parenting",
+                    "Parenting Style",
+                    "Child Development",
+                    "Family Activities",
+                    "Education Choices",
+                    "Family Values",
+                    "Work-Family Balance",
+                    "Family Goals",
+                    "Childcare Approach",
+                    "Family Challenges",
+                    "Family Traditions",
+                    "Future Planning"
+                ],
+                "Inspirations & Influences": [
+                    "General Influences",
+                    "Role Models",
+                    "Mentors & Teachers",
+                    "Inspiring Books",
+                    "Life-Changing Events",
+                    "Creative Influences",
+                    "Cultural Inspirations",
+                    "Career Influences",
+                    "Personal Heroes",
+                    "Motivational Sources",
+                    "Artistic Influences",
+                    "Philosophical Influences"
+                ],
+                "Humor & Entertainment": [
+                    "General Entertainment",
+                    "Sense of Humor",
+                    "Comedy Preferences",
+                    "Entertainment Choices",
+                    "Movie Tastes",
+                    "TV Shows",
+                    "Music Preferences",
+                    "Gaming Interests",
+                    "Reading Preferences",
+                    "Social Media",
+                    "Live Entertainment",
+                    "Content Creation"
+                ],
+                "Personality & Character": [
+                    "General Personality",
+                    "Core Traits",
+                    "Communication Style",
+                    "Decision Making",
+                    "Social Tendencies",
+                    "Emotional Style",
+                    "Leadership Style",
+                    "Conflict Approach",
+                    "Risk Tolerance",
+                    "Adaptability",
+                    "Personal Strengths",
+                    "Growth Areas"
+                ],
+                "Food & Drink": [
+                    "General Preferences",
+                    "Favorite Cuisines",
+                    "Cooking Skills",
+                    "Dietary Choices",
+                    "Restaurant Preferences",
+                    "Beverage Choices",
+                    "Food Adventures",
+                    "Recipe Collection",
+                    "Food Traditions",
+                    "Dining Habits",
+                    "Food Philosophy",
+                    "Culinary Goals"
+                ],
+                "Career & Professional": [
+                    "General Career",
+                    "Professional Background",
+                    "Technical Skills",
+                    "Leadership Experience",
+                    "Project Management",
+                    "Industry Knowledge",
+                    "Career Goals",
+                    "Work Experience",
+                    "Remote Work",
+                    "Workplace Culture",
+                    "Professional Development",
+                    "Career Challenges"
+                ],
+                "Education & Skills": [
+                    "General Education",
+                    "Education History",
+                    "Research Experience",
+                    "Communication Skills",
+                    "Problem-Solving",
+                    "Languages",
+                    "Certifications",
+                    "Technical Training",
+                    "Self-Learning",
+                    "Academic Achievements",
+                    "Study Methods",
+                    "Learning Goals"
+                ],
+                "Personal Development": [
+                    "General Growth",
+                    "Work-Life Balance",
+                    "Personal Growth",
+                    "Life Goals",
+                    "Values & Beliefs",
+                    "Motivation & Drive",
+                    "Time Management",
+                    "Stress Management",
+                    "Decision Making",
+                    "Self-Awareness",
+                    "Personal Challenges",
+                    "Future Aspirations"
+                ],
+                "Interests & Lifestyle": [
+                    "General Interests",
+                    "Hobbies",
+                    "Travel Experiences",
+                    "Cultural Interests",
+                    "Sports & Fitness",
+                    "Creative Pursuits",
+                    "Reading Habits",
+                    "Entertainment",
+                    "Food & Cuisine",
+                    "Music & Arts",
+                    "Technology Usage",
+                    "Lifestyle Choices"
+                ],
+                "Social & Relationships": [
+                    "General Social",
+                    "Team Collaboration",
+                    "Cultural Background",
+                    "Community Involvement",
+                    "Mentorship",
+                    "Social Activities",
+                    "Networking",
+                    "Family Dynamics",
+                    "Friendship",
+                    "Social Impact",
+                    "Communication Style",
+                    "Cultural Exchange"
+                ],
+                "Innovation & Creativity": [
+                    "General Innovation",
+                    "Creative Process",
+                    "Problem Innovation",
+                    "Design Thinking",
+                    "Ideation Methods",
+                    "Creative Projects",
+                    "Innovation Mindset",
+                    "Creative Challenges",
+                    "Artistic Expression",
+                    "Technical Innovation",
+                    "Creative Collaboration",
+                    "Future Vision"
+                ],
+                "Beliefs & Values": [
+                    "General Beliefs",
+                    "Religious Views",
+                    "Political Views",
+                    "Moral Framework",
+                    "Ethical Principles",
+                    "Spiritual Practices",
+                    "Cultural Values",
+                    "Social Justice",
+                    "Human Rights",
+                    "Economic Views",
+                    "Tradition & Heritage",
+                    "Personal Philosophy"
+                ],
+                "Entertainment": [
+                    "General Entertainment",
+                    "Favorite Movies",
+                    "Favorite TV Shows",
+                    "Favorite Music",
+                    "Favorite Books",
+                    "Favorite Games",
+                    "Favorite Sports",
+                    "Favorite Hobbies",
+                    "Favorite Travel Destinations",
+                    "Favorite Food",
+                    "Favorite Drink",
+                    "Favorite Activities"
+                ],
+                "Worldview & Society": [
+                    "General Perspective",
+                    "Global Issues",
+                    "Social Change",
+                    "Environmental Views",
+                    "Technology Impact",
+                    "Future of Society",
+                    "Cultural Perspectives",
+                    "Education Systems",
+                    "Healthcare Views",
+                    "Economic Systems",
+                    "Social Structures",
+                    "World Challenges"
+                ]
+            }
+            categories = sorted(list(subject_categories.keys()))
+            selected_category = st.selectbox(
+                "1️⃣ Select Category",
+                ["General"] + categories,
+                help="Choose a broad category to narrow down your focus area"
+            )
+
+        with col2:
+            if selected_category == "General":
+                selected_subject = "General"
+            else:
+                sorted_subjects = sorted(subject_categories[selected_category])
+                selected_subject = st.selectbox(
+                    "2️⃣ Select Specific Focus",
+                    sorted_subjects,
+                    help="Choose a specific area within the selected category"
+                )
+        
+        # Custom subject option
+        use_custom = st.checkbox("🎯 Use Custom Subject", help="Define your own subject area")
+        if use_custom:
+            custom_subject = st.text_input("Enter Custom Subject", placeholder="e.g., Artificial Intelligence Ethics")
+            new_subject = custom_subject if custom_subject else None
+        else:
+            new_subject = selected_subject.lower() if selected_subject != "General" else None
+
+        # Update Subject button
+        if st.button("📝 Update Interview Focus", type="primary", use_container_width=True):
+            st.session_state.context_focus = new_subject
+            st.session_state.messages = []
+            st.session_state.context_data = ""
+            st.session_state.interview_started = True
+            st.session_state.interview_complete = False
+            question = get_random_question(api_key, new_subject)
+            if question:
+                st.session_state.messages.append(f"Q: {question}")
+                st.rerun()
     else:
-        new_subject = selected_subject.lower() if selected_subject != "General" else None
-
-    # Update Subject button
-    if st.button("📝 Update Interview Focus", type="primary", use_container_width=True):
-        st.session_state.context_focus = new_subject
-        st.session_state.messages = []
-        st.session_state.context_data = ""
-        st.session_state.interview_started = True
-        st.session_state.interview_complete = False
-        question = get_random_question(api_key, new_subject)
-        if question:
-            st.session_state.messages.append(f"Q: {question}")
-            st.rerun()
-else:
-    st.session_state.context_focus = None
-
-st.markdown('</div>', unsafe_allow_html=True)
+        st.session_state.context_focus = None
 
 # Initialize tabs
 tab1, tab2, tab3 = st.tabs(["Interview", "Context Review", "How it Works"])
@@ -393,11 +724,14 @@ with tab1:
                 )
 
     # Display chat messages
-    for i, message in enumerate(st.session_state.messages):
+    tab1.write("")  # Add some spacing
+    for message in st.session_state.messages:
         if message.startswith("Q: "):
-            display_chat_message(message[3:], is_user=False)
+            with tab1.chat_message("assistant", avatar="https://res.cloudinary.com/drrvnflqy/image/upload/v1740345962/corn-stickers_1_cqpgji.png"):
+                st.write(message[3:])
         else:
-            display_chat_message(message, is_user=True)
+            with tab1.chat_message("user"):
+                st.write(message)
 
     # Input area
     if api_key and st.session_state.interview_started and not st.session_state.interview_complete:
