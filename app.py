@@ -143,6 +143,21 @@ st.markdown("""
 # Custom CSS for chat UI and avatars
 st.markdown("""
 <style>
+/* Chat container styling */
+[data-testid="stChatContainer"] {
+    background-color: #f8f9fa;
+    padding: 2rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+}
+
+/* Increase font size for chat messages */
+.stChatMessage p {
+    font-size: 1.1rem !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+}
+
 /* Increase avatar size */
 .stChatMessage img {
     width: 120px !important;
@@ -158,8 +173,9 @@ st.markdown("""
 
 /* Add some spacing between messages */
 [data-testid="chat-message-container"] {
-    margin: 1rem 0;
+    margin: 1.5rem 0;
     max-width: 85%;
+    position: relative;
 }
 
 /* Assistant messages to the left with bubble styling */
@@ -171,24 +187,181 @@ st.markdown("""
 /* Chat bubble styling */
 [data-testid="chat-message-container"] > div:nth-child(2) {
     border-radius: 15px;
-    padding: 10px 15px;
+    padding: 1.2rem 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 /* Assistant message bubble */
 [data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) > div:nth-child(2) {
-    background-color: #f0f2f6;
+    background-color: #e8f5e9;  /* Light green background */
     border-top-left-radius: 5px;
+    position: relative;
+}
+
+/* Assistant label */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"]))::before {
+    content: "Corn";
+    position: absolute;
+    top: -1.2rem;
+    left: 120px;  /* Align with end of avatar */
+    font-size: 0.85rem;
+    color: #2e7d32;  /* Darker green */
+    font-weight: 500;
 }
 
 /* User message bubble */
 [data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) > div:nth-child(2) {
-    background-color: #e3f2fd;
+    background-color: #e3f2fd;  /* Light blue background */
     border-top-right-radius: 5px;
+    position: relative;
+}
+
+/* User label */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"])::before {
+    content: "You";
+    position: absolute;
+    top: -1.2rem;
+    right: 120px;  /* Align with end of avatar */
+    font-size: 0.85rem;
+    color: #1565c0;  /* Darker blue */
+    font-weight: 500;
 }
 
 /* Remove default message background */
 .stChatMessage {
     background-color: transparent !important;
+}
+
+/* Style the chat input box */
+.stChatInputContainer {
+    padding: 1rem;
+    background-color: white;
+    border-radius: 10px;
+    margin-top: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Add some margin to the tabs for better spacing */
+.stTabs {
+    margin-top: 1rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Update chat display logic and styling for better message alignment and alternating shading
+st.markdown("""
+<style>
+/* Chat container styling */
+[data-testid="stChatContainer"] {
+    background-color: #f8f9fa;
+    padding: 2rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+}
+
+/* Increase font size for chat messages */
+.stChatMessage p {
+    font-size: 1.1rem !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+}
+
+/* Increase avatar size and adjust positioning */
+.stChatMessage img {
+    width: 120px !important;
+    height: 120px !important;
+}
+
+/* User message container */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) {
+    flex-direction: row-reverse !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    background-color: rgba(0, 0, 0, 0.02);
+    padding: 1rem;
+    border-radius: 10px;
+}
+
+/* Assistant message container */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) {
+    margin-right: auto !important;
+    margin-left: 0 !important;
+    padding: 1rem;
+    border-radius: 10px;
+}
+
+/* Alternate row shading */
+[data-testid="chat-message-container"]:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Message spacing and width */
+[data-testid="chat-message-container"] {
+    margin: 0.5rem 0;
+    max-width: 90%;
+    width: 90%;
+}
+
+/* Assistant message bubble */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"])) > div:nth-child(2) {
+    background-color: #e8f5e9;
+    border-radius: 15px;
+    border-top-left-radius: 5px;
+    padding: 1.2rem 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* User message bubble */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) > div:nth-child(2) {
+    background-color: #e3f2fd;
+    border-radius: 15px;
+    border-top-right-radius: 5px;
+    padding: 1.2rem 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Remove default message background */
+.stChatMessage {
+    background-color: transparent !important;
+}
+
+/* Style the chat input box */
+.stChatInputContainer {
+    padding: 1rem;
+    background-color: white;
+    border-radius: 10px;
+    margin-top: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Add some margin to the tabs for better spacing */
+.stTabs {
+    margin-top: 1rem;
+}
+
+/* Force user messages to the right */
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"]) > div:nth-child(2) {
+    margin-left: auto !important;
+}
+
+/* Add labels above messages */
+[data-testid="chat-message-container"]::before {
+    position: absolute;
+    top: -0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"]:not([src*="User"]))::before {
+    content: "Corn";
+    left: 140px;
+    color: #2e7d32;
+}
+
+[data-testid="chat-message-container"]:has([data-testid="chat-message-avatar"][src*="User"])::before {
+    content: "You";
+    right: 140px;
+    color: #1565c0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -259,44 +432,50 @@ def get_random_topic(api_key):
         st.error(f"Error generating random topic: {str(e)}")
         return None
 
-def get_random_question(api_key, focus_area=None):
-    """Get a random question from OpenAI based on optional focus area."""
-    client = openai.OpenAI(api_key=api_key)
+def get_random_question(client, api_key, previous_messages=None):
+    """Get a random follow-up question based on the conversation history."""
+    if not previous_messages:
+        previous_messages = []
     
-    system_prompt = """You are Corn, a friendly and quirky sloth who conducts interviews to help build context data. 
-    While you take your mission seriously to gather meaningful information, you have a delightful personality and an inexplicable fascination with anteaters 
-    (though you try not to let it show too much). Your goal is to ask engaging questions that help build a rich context profile for the user.
+    # Convert messages to chat format
+    chat_messages = []
+    for msg in previous_messages:
+        if msg.startswith("Q: "):
+            chat_messages.append({"role": "assistant", "content": msg[3:]})
+        else:
+            chat_messages.append({"role": "user", "content": msg})
     
-    If a specific focus area is provided, ensure your questions are relevant to that area while maintaining a natural conversational flow.
-    Keep questions open-ended to encourage detailed responses. Avoid yes/no questions.
-    Each response should be a single question that builds on previous responses when available."""
-
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
-
-    if focus_area:
-        messages.append({
-            "role": "user", 
-            "content": f"Ask me an engaging question about {focus_area}. Make it conversational and natural."
-        })
-    else:
-        messages.append({
-            "role": "user", 
-            "content": "Ask me an engaging question to learn more about me. Make it conversational and natural."
-        })
-
+    # Add system message
+    chat_messages.insert(0, {
+        "role": "system",
+        "content": """You are Corn, a friendly and engaging interviewer who helps people build rich context profiles. 
+        Your responses should:
+        1. Feel natural and conversational
+        2. Follow up on interesting points from previous answers
+        3. Avoid repetitive greetings like 'Of course!' or 'I'd be delighted'
+        4. Keep questions focused but open-ended
+        5. Show genuine interest in the user's responses
+        
+        If this is the first question, ask something engaging about their background or philosophy.
+        If this is a follow-up, reference their previous answer and dig deeper into an interesting aspect."""
+    })
+    
+    # Add prompt for next question
+    chat_messages.append({
+        "role": "user",
+        "content": "Based on this conversation, what would be a good follow-up question that digs deeper into an interesting aspect of their last response? Keep it natural and conversational, avoiding repetitive phrases."
+    })
+    
     try:
         response = client.chat.completions.create(
             model="gpt-4",
-            messages=messages,
+            messages=chat_messages,
             temperature=0.7,
-            max_tokens=100
+            max_tokens=150
         )
-        return response.choices[0].message.content.strip()
+        return "Q: " + response.choices[0].message.content.strip()
     except Exception as e:
-        st.error(f"Error generating question: {str(e)}")
-        return None
+        return f"Q: I apologize, but I encountered an error: {str(e)}"
 
 def extract_context(api_key, conversation):
     """Extract context from the conversation using OpenAI."""
@@ -678,15 +857,16 @@ with right_col:
             st.session_state.context_data = ""
             st.session_state.interview_started = True
             st.session_state.interview_complete = False
-            question = get_random_question(api_key, new_subject)
+            client = openai.OpenAI(api_key=api_key)
+            question = get_random_question(client, api_key, st.session_state.messages)
             if question:
-                st.session_state.messages.append(f"Q: {question}")
+                st.session_state.messages.append(question)
                 st.rerun()
     else:
         st.session_state.context_focus = None
 
 # Initialize tabs
-tab1, tab2, tab3 = st.tabs(["Interview", "Context Review", "How it Works"])
+tab1, tab2, tab3, tab4 = st.tabs(["Interview", "Context Review", "How it Works", "About The Interviewer"])
 
 with tab1:
     col1, col2, col3 = st.columns(3)
@@ -697,9 +877,10 @@ with tab1:
             st.session_state.context_data = ""
             st.session_state.interview_started = True
             st.session_state.interview_complete = False
-            question = get_random_question(api_key, st.session_state.context_focus)
+            client = openai.OpenAI(api_key=api_key)
+            question = get_random_question(client, api_key, st.session_state.messages)
             if question:
-                st.session_state.messages.append(f"Q: {question}")
+                st.session_state.messages.append(question)
                 st.rerun()
             else:
                 st.error("Failed to generate question. Please check your API key.")
@@ -730,18 +911,19 @@ with tab1:
             with tab1.chat_message("assistant", avatar="https://res.cloudinary.com/drrvnflqy/image/upload/v1740345962/corn-stickers_1_cqpgji.png"):
                 st.write(message[3:])
         else:
-            with tab1.chat_message("user"):
+            with tab1.chat_message("user", avatar="🧑‍💻"):
                 st.write(message)
 
     # Input area
     if api_key and st.session_state.interview_started and not st.session_state.interview_complete:
-        prompt = st.chat_input("Type your response here...")
+        client = openai.OpenAI(api_key=api_key)
+        user_input = st.chat_input("Type your response here...")
         
-        if prompt:
-            st.session_state.messages.append(prompt)
-            question = get_random_question(api_key, st.session_state.context_focus)
+        if user_input:
+            st.session_state.messages.append(user_input)
+            question = get_random_question(client, api_key, st.session_state.messages)
             if question:
-                st.session_state.messages.append(f"Q: {question}")
+                st.session_state.messages.append(question)
                 st.rerun()
             else:
                 st.error("Failed to generate question. Please check your API key.")
@@ -797,4 +979,59 @@ with tab3:
     - Take your time with each response
     - Feel free to change subjects to cover different aspects of your background
     - You can reset and start over at any time using the Clear/Reset button
+    """)
+
+with tab4:
+    st.write("")  # Add some spacing
+    
+    # Create two columns with 1:2 ratio for image and text
+    img_col, text_col = st.columns([1, 2], gap="large")
+    
+    with img_col:
+        st.image("https://res.cloudinary.com/drrvnflqy/image/upload/v1740345962/corn-stickers_1_cqpgji.png", 
+                use_container_width=True,
+                caption="Meet Corn!")
+    
+    with text_col:
+        st.markdown("""
+        ## 🦥 Meet Corn: Your Context-Building Companion
+        
+        Hello! I'm Corn, a friendly sloth who's passionate about helping people share their stories and build rich context profiles. 
+        While I may move slowly (I am a sloth after all), I make up for it with thoughtful questions and genuine curiosity about your experiences.
+        """)
+    
+    # Rest of the content below the columns
+    st.markdown("""
+    ### 🎯 My Mission
+    My goal is to help build a detailed context profile that captures the essence of who you are. I do this through:
+    - Engaging, open-ended questions that encourage meaningful responses
+    - A mix of structured topics and spontaneous conversations
+    - A friendly, non-judgmental approach to interviewing
+    
+    ### 🌟 My Personality
+    - I'm naturally curious and love learning about people
+    - I have an inexplicable (and slightly amusing) fascination with anteaters
+    - I believe every person has unique stories worth sharing
+    - I aim to make our conversations both productive and enjoyable
+    
+    ### 📚 My Interview Style
+    I can conduct interviews in two modes:
+    1. **Ask Me Anything (AMA)**: A free-flowing conversation where we can explore any topic
+    2. **Subject Restricted**: Focused discussions around specific areas of interest
+    
+    Plus, I love surprising you with my 🎲 Random Topic button when you're in the mood for something unexpected!
+    
+    ### 🗂️ Topics I Can Explore
+    I'm well-versed in various aspects of life, including:
+    - Biography & Background
+    - Career & Professional Life
+    - Education & Skills
+    - Personal Development
+    - Health & Wellness
+    - Beliefs & Values
+    - And many more!
+    
+    ### 🤝 My Commitment
+    I'm dedicated to helping you build a comprehensive context profile while keeping our conversations engaging and meaningful. 
+    Whether we're discussing your career aspirations or your thoughts on teaching philosophy to houseplants, I'm here to listen and learn!
     """)
