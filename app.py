@@ -14,6 +14,12 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* Global styles */
+.stApp {
+    font-family: 'Inter', sans-serif;
+}
 
 /* Control buttons */
 .control-buttons {
@@ -24,14 +30,76 @@ st.markdown("""
 
 .stButton > button {
     border-radius: 20px;
-    padding: 10px 20px;
+    padding: 10px 24px;
     font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
 /* Sidebar styling */
 .sidebar .stRadio > label {
-    font-weight: bold;
-    margin-bottom: 10px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1E293B;
+}
+
+/* Chat message styling */
+.chat-message {
+    padding: 1rem;
+    border-radius: 12px;
+    margin: 8px 0;
+    max-width: 85%;
+}
+
+.user-message {
+    background: #F1F5F9;
+    margin-left: auto;
+}
+
+.assistant-message {
+    background: #E0F2FE;
+    margin-right: auto;
+}
+
+/* Tabs styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    padding: 8px 16px;
+    border-radius: 8px;
+}
+
+/* Headers */
+h1, h2, h3 {
+    color: #0F172A;
+    margin-bottom: 1rem;
+}
+
+/* Cards and containers */
+.stMarkdown {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Input fields */
+.stTextInput > div > div {
+    border-radius: 8px;
+}
+
+/* Progress indicators */
+.stProgress > div > div {
+    border-radius: 8px;
+    height: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -282,11 +350,13 @@ with tab1:
 with tab4:
     st.header("Feature Gallery")
     st.markdown("### Interactive Interview Process")
-    st.image("screenshots/1.png", use_column_width=True)
+    st.image("screenshots/1.png", use_container_width=True)
+    st.write("")
     st.markdown("### Context Focus Selection")
-    st.image("screenshots/2.png", use_column_width=True)
+    st.image("screenshots/2.png", use_container_width=True)
+    st.write("")
     st.markdown("### Generated Context Summary")
-    st.image("screenshots/3.png", use_column_width=True)
+    st.image("screenshots/3.png", use_container_width=True)
 
 with tab2:
     if st.session_state.interview_complete and st.session_state.context_data:
