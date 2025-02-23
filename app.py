@@ -2,7 +2,12 @@ import streamlit as st
 import openai
 import json
 import os
+import time
+import gc
 from datetime import datetime
+from contextlib import contextmanager
+from typing import Optional
+import signal
 
 # Page configuration
 st.set_page_config(
@@ -406,6 +411,30 @@ def load_api_key():
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
+class TimeoutError(Exception):
+    pass
+
+@contextmanager
+def timeout(seconds: int):
+    def signal_handler(signum, frame):
+        raise TimeoutError("API request timed out")
+    
+    # Register a function to raise a TimeoutError on the signal
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        # Disable the alarm
+        signal.alarm(0)
+
+def clear_old_messages():
+    """Clear messages older than the last 50"""
+    if 'messages' in st.session_state and len(st.session_state.messages) > 50:
+        st.session_state.messages = st.session_state.messages[-50:]
+    gc.collect()
+
 def get_random_topic(api_key):
     """Generate a completely random, potentially quirky topic for discussion."""
     client = openai.OpenAI(api_key=api_key)
@@ -418,94 +447,80 @@ def get_random_topic(api_key):
     Return ONLY the topic/question, nothing else."""
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "Generate a random, unexpected topic or question."}
-            ],
-            temperature=1.0,  # High temperature for more randomness
-            max_tokens=50
-        )
-        return response.choices[0].message.content.strip()
+        with timeout(30):  # 30 second timeout
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": "Generate a random, unexpected topic or question."}
+                ],
+                temperature=1.0,  # High temperature for more randomness
+                max_tokens=50
+            )
+            return response.choices[0].message.content.strip()
+    except TimeoutError:
+        st.error("API request timed out. Please try again.")
+        return None
     except Exception as e:
         st.error(f"Error generating random topic: {str(e)}")
         return None
 
 def get_random_question(client, api_key, previous_messages=None):
-    """Get a random follow-up question based on the conversation history."""
-    if not previous_messages:
-        previous_messages = []
-    
-    # Convert messages to chat format
-    chat_messages = []
-    for msg in previous_messages:
-        if msg.startswith("Q: "):
-            chat_messages.append({"role": "assistant", "content": msg[3:]})
-        else:
-            chat_messages.append({"role": "user", "content": msg})
-    
-    # Add system message
-    chat_messages.insert(0, {
-        "role": "system",
-        "content": """You are Corn, a friendly and engaging interviewer who helps people build rich context profiles. 
-        Your responses should:
-        1. Feel natural and conversational
-        2. Follow up on interesting points from previous answers
-        3. Avoid repetitive greetings like 'Of course!' or 'I'd be delighted'
-        4. Keep questions focused but open-ended
-        5. Show genuine interest in the user's responses
-        
-        If this is the first question, ask something engaging about their background or philosophy.
-        If this is a follow-up, reference their previous answer and dig deeper into an interesting aspect."""
-    })
-    
-    # Add prompt for next question
-    chat_messages.append({
-        "role": "user",
-        "content": "Based on this conversation, what would be a good follow-up question that digs deeper into an interesting aspect of their last response? Keep it natural and conversational, avoiding repetitive phrases."
-    })
-    
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=chat_messages,
-            temperature=0.7,
-            max_tokens=150
-        )
-        return "Q: " + response.choices[0].message.content.strip()
+        with timeout(30):  # 30 second timeout
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": """You are Corn, a friendly and engaging interviewer who helps people build rich context profiles. 
+                    Your responses should:
+                    1. Feel natural and conversational
+                    2. Follow up on interesting points from previous answers
+                    3. Avoid repetitive greetings like 'Of course!' or 'I'd be delighted'
+                    4. Keep questions focused but open-ended
+                    5. Show genuine interest in the user's responses
+                    
+                    If this is the first question, ask something engaging about their background or philosophy.
+                    If this is a follow-up, reference their previous answer and dig deeper into an interesting aspect."""},
+                    {"role": "user", "content": f"Previous messages: {previous_messages[-3:] if previous_messages else 'None'}. Generate a follow-up question."}
+                ],
+                temperature=0.7,
+                max_tokens=150
+            )
+            clear_old_messages()  # Clean up old messages
+            return "Q: " + response.choices[0].message.content.strip()
+    except TimeoutError:
+        st.error("API request timed out. Please try again.")
+        return None
     except Exception as e:
-        return f"Q: I apologize, but I encountered an error: {str(e)}"
+        st.error(f"Error generating question: {str(e)}")
+        return None
 
 def extract_context(api_key, conversation):
-    """Extract context from the conversation using OpenAI."""
-    client = openai.OpenAI(api_key=api_key)
-    
-    system_prompt = """You are Corn, a diligent sloth assistant who excels at extracting and organizing meaningful context from conversations.
-    While you occasionally daydream about anteaters, you stay focused on your primary mission: creating clear, well-structured context summaries.
-    
-    Analyze the conversation and create a detailed but concise summary that:
-    1. Captures key information, insights, and patterns
-    2. Organizes the information in a clear, logical structure
-    3. Maintains the user's voice and perspective
-    4. Focuses on substantive content rather than casual conversation
-    5. Uses markdown formatting for better readability"""
-
-    conversation_text = "\n".join(conversation)
-    
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Please extract and organize the context from this conversation:\n\n{conversation_text}"}
-    ]
-
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.5,
-            max_tokens=1000
-        )
-        return response.choices[0].message.content.strip()
+        with timeout(45):  # 45 second timeout
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": """You are Corn, a diligent sloth assistant who excels at extracting and organizing meaningful context from conversations.
+                    While you occasionally daydream about anteaters, you stay focused on your primary mission: creating clear, well-structured context summaries.
+                    
+                    Analyze the conversation and create a detailed but concise summary that:
+                    1. Captures key information, insights, and patterns
+                    2. Organizes the information in a clear, logical structure
+                    3. Maintains the user's voice and perspective
+                    4. Focuses on substantive content rather than casual conversation
+                    5. Uses markdown formatting for better readability"""},
+                    {"role": "user", "content": f"Please extract and organize the context from this conversation:\n\n{conversation}"}
+                ],
+                temperature=0.5,
+                max_tokens=1000
+            )
+            gc.collect()  # Force garbage collection
+            return response.choices[0].message.content.strip()
+    except TimeoutError:
+        st.error("Context extraction timed out. Please try again.")
+        return None
     except Exception as e:
         st.error(f"Error extracting context: {str(e)}")
         return None
