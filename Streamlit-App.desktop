@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Streamlit App
+Comment=Launch Streamlit Application
+Exec=bash -c "cd %k && source .venv/bin/activate && streamlit run app.py"
+Terminal=true
+Categories=Development;

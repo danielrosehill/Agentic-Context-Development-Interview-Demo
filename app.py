@@ -10,96 +10,113 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for chat bubbles, badges, and Font Awesome
+# Clean, simplified CSS
 st.markdown("""
 <style>
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-/* Global styles */
-.stApp {
+/* Base styles */
+* {
     font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-/* Control buttons */
-.control-buttons {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+/* Main container spacing */
+.main {
+    padding: 2rem;
 }
 
+/* Clean header styles */
+header {
+    border-bottom: none !important;
+    background: none !important;
+    margin-bottom: 2rem;
+}
+
+.stApp header {
+    background-color: transparent !important;
+    border-bottom: none !important;
+}
+
+/* Remove default Streamlit styling */
+.block-container {
+    padding-top: 2rem !important;
+    max-width: 1200px;
+}
+
+.stMarkdown {
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+/* Button styling */
 .stButton > button {
-    border-radius: 20px;
-    padding: 10px 24px;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    background-color: #2196f3;
+    color: white;
+    border: none;
     font-weight: 500;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-/* Sidebar styling */
-.sidebar .stRadio > label {
-    font-weight: 600;
-    margin-bottom: 12px;
-    color: #1E293B;
+    background-color: #1976d2;
 }
 
 /* Chat message styling */
 .chat-message {
     padding: 1rem;
-    border-radius: 12px;
-    margin: 8px 0;
-    max-width: 85%;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    background: #f8f9fa;
 }
 
-.user-message {
-    background: #F1F5F9;
-    margin-left: auto;
-}
-
-.assistant-message {
-    background: #E0F2FE;
-    margin-right: auto;
-}
-
-/* Tabs styling */
+/* Tab styling */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 1rem;
+    border-bottom: 2px solid #f0f0f0;
 }
 
 .stTabs [data-baseweb="tab"] {
-    padding: 8px 16px;
-    border-radius: 8px;
+    height: 40px;
+    padding: 0 16px;
+    color: #666;
 }
 
-/* Headers */
-h1, h2, h3 {
-    color: #0F172A;
-    margin-bottom: 1rem;
+.stTabs [data-baseweb="tab-highlight"] {
+    background-color: #2196f3;
 }
 
-/* Cards and containers */
-.stMarkdown {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+/* Sidebar styling */
+.css-1d391kg {
+    padding: 2rem 1rem;
 }
 
 /* Input fields */
 .stTextInput > div > div {
     border-radius: 8px;
+    border: 1px solid #e0e0e0;
 }
 
-/* Progress indicators */
-.stProgress > div > div {
-    border-radius: 8px;
-    height: 8px;
+/* Text size */
+.stTextInput, .stTextArea, .stMarkdown, .stText {
+    font-size: 16px !important;
+}
+
+div[data-testid="stChatMessage"] {
+    font-size: 16px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Custom CSS to adjust avatar size
+st.markdown("""
+<style>
+/* Increase avatar size */
+.stChatMessage img {
+    width: 60px !important;
+    height: 60px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -199,101 +216,152 @@ def generate_markdown_filename(context_focus):
     subject = context_focus if context_focus else "general"
     return f"context_{subject}_{timestamp}.md"
 
-# Sidebar for settings
-with st.sidebar:
-    st.title("Settings")
-    
-    # API Key Management
-    st.subheader("API Key")
-    stored_key = load_api_key()
-    
-    if stored_key:
-        st.session_state.use_stored_key = st.checkbox("Use stored API key", value=st.session_state.use_stored_key)
-    
-    if stored_key and st.session_state.use_stored_key:
-        api_key = stored_key
-        st.success("Using stored API key")
+def display_chat_message(message, is_user=False):
+    """Display a chat message using Streamlit's chat components."""
+    if is_user:
+        with st.chat_message("user", avatar="https://ui-avatars.com/api/?name=User&background=random"):
+            st.write(message)
     else:
-        api_key = st.text_input("Enter OpenAI API Key", type="password")
-        if api_key:
-            if st.button("Save API Key"):
-                save_api_key(api_key)
-                st.success("API key saved successfully!")
-                st.rerun()
-    
-    st.divider()
-    
-    # Interview Settings
-    st.subheader("Interview Settings")
-    st.session_state.interview_mode = st.radio(
-        "Interview Mode",
-        ["AMA (Ask Me Anything)", "Subject Restricted"],
-        index=0 if st.session_state.interview_mode == "AMA (Ask Me Anything)" else 1
-    )
-    
-    if st.session_state.interview_mode == "Subject Restricted":
-        predefined_subjects = ["General", "Professional Background", "Technical Skills", "Education", "Interests"]
-        selected_subject = st.selectbox("Select Subject Focus", predefined_subjects)
-        
-        use_custom = st.checkbox("Use Custom Subject")
-        if use_custom:
-            custom_subject = st.text_input("Enter Custom Subject")
-            new_subject = custom_subject if custom_subject else None
-        else:
-            new_subject = selected_subject.lower() if selected_subject != "General" else None
-            
-        # Add Update Subject button
-        if st.button("Update Subject", type="primary"):
-            st.session_state.context_focus = new_subject
-            st.session_state.messages = []
-            st.session_state.context_data = ""
-            st.session_state.interview_started = True
-            st.session_state.interview_complete = False
-            question = get_random_question(api_key, new_subject)
-            if question:
-                st.session_state.messages.append(f"Q: {question}")
-                st.rerun()
-    else:
-        st.session_state.context_focus = None
+        with st.chat_message("assistant", avatar="https://res.cloudinary.com/drrvnflqy/image/upload/v1740344521/CB_1_jfptsm.png"):
+            st.write(message)
 
-    # Add a clear button to reset everything
-    if st.button("Clear All", type="secondary"):
-        st.session_state.messages = []
-        st.session_state.interview_started = False
-        st.session_state.interview_complete = False
-        st.session_state.context_data = ""
-        st.session_state.context_focus = None
-        st.rerun()
+# Sidebar for API settings
+with st.sidebar:
+    st.write("## API Settings")
+    
+    use_stored_key = st.checkbox("Use stored API key", value=st.session_state.use_stored_key)
+    st.session_state.use_stored_key = use_stored_key
+
+    if use_stored_key:
+        api_key = load_api_key()
+        if not api_key:
+            st.warning("No stored API key found. Please enter one below.")
+    
+    api_key_input = st.text_input("OpenAI API Key:", type="password", value=api_key if use_stored_key and api_key else "")
+    
+    if api_key_input:
+        if use_stored_key:
+            save_api_key(api_key_input)
+        api_key = api_key_input
+    else:
+        st.error("Please enter an API key to continue")
+        st.stop()
 
 # Main content
-st.title("Agentic Context Development Interview")
+st.write("# Agentic Context Development Interview")
 
-# GitHub badges
-st.markdown("""
-<div style="text-align: center; margin-bottom: 20px;">
-    <a href="https://github.com/danielrosehill" class="github-badge" target="_blank">
-        <i class="fab fa-github"></i> Author's GitHub
-    </a>
-    <a href="https://github.com/danielrosehill/Agentic-Context-Development-Interview-Demo" class="github-badge" target="_blank">
-        <i class="fab fa-github"></i> Project Repository
-    </a>
-</div>
-""", unsafe_allow_html=True)
+# Interview Configuration
+st.markdown('<div class="subject-settings">', unsafe_allow_html=True)
+st.markdown("### 📋 Interview Configuration")
 
-st.markdown("""
-This application provides a simple interface for using a large language model to conduct context-generating interviews. 
-It creates context snippets that can be fed into vector storage for personalized LLM inference. You can use a data pipeline 
-to provide your data into the vector database of your choice.
-""")
+# Interview Mode Selection
+st.session_state.interview_mode = st.radio(
+    "Interview Mode",
+    ["AMA (Ask Me Anything)", "Subject Restricted"],
+    index=0 if st.session_state.interview_mode == "AMA (Ask Me Anything)" else 1,
+    help="Choose between an open-ended interview or focus on specific subjects"
+)
 
-# Create tabs for different sections
-tab1, tab2, tab3, tab4 = st.tabs(["Interview", "Generated Context", "Instructions", "Gallery"])
+subject_categories = {
+    "Career & Professional": [
+        "Professional Background",
+        "Technical Skills",
+        "Leadership Experience",
+        "Project Management",
+        "Industry Knowledge",
+        "Career Goals",
+        "Work Experience"
+    ],
+    "Education & Skills": [
+        "Education History",
+        "Research Experience",
+        "Communication Skills",
+        "Problem-Solving",
+        "Languages",
+        "Certifications"
+    ],
+    "Personal Development": [
+        "Work-Life Balance",
+        "Personal Growth",
+        "Life Goals",
+        "Values & Beliefs",
+        "Motivation & Drive"
+    ],
+    "Interests & Lifestyle": [
+        "Hobbies",
+        "Travel Experiences",
+        "Cultural Interests",
+        "Sports & Fitness",
+        "Creative Pursuits"
+    ],
+    "Social & Relationships": [
+        "Team Collaboration",
+        "Cultural Background",
+        "Community Involvement",
+        "Mentorship",
+        "Social Activities"
+    ]
+}
+
+if st.session_state.interview_mode == "Subject Restricted":
+    st.markdown("""
+    <div style="margin-top: 15px;">
+        <h4>Select Your Interview Focus</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        categories = sorted(list(subject_categories.keys()))
+        selected_category = st.selectbox(
+            "1️⃣ Select Category",
+            ["General"] + categories,
+            help="Choose a broad category to narrow down your focus area"
+        )
+
+    with col2:
+        if selected_category == "General":
+            selected_subject = "General"
+        else:
+            sorted_subjects = sorted(subject_categories[selected_category])
+            selected_subject = st.selectbox(
+                "2️⃣ Select Specific Focus",
+                sorted_subjects,
+                help="Choose a specific area within the selected category"
+            )
+    
+    # Custom subject option
+    use_custom = st.checkbox("🎯 Use Custom Subject", help="Define your own subject area")
+    if use_custom:
+        custom_subject = st.text_input("Enter Custom Subject", placeholder="e.g., Artificial Intelligence Ethics")
+        new_subject = custom_subject if custom_subject else None
+    else:
+        new_subject = selected_subject.lower() if selected_subject != "General" else None
+
+    # Update Subject button
+    if st.button("📝 Update Interview Focus", type="primary", use_container_width=True):
+        st.session_state.context_focus = new_subject
+        st.session_state.messages = []
+        st.session_state.context_data = ""
+        st.session_state.interview_started = True
+        st.session_state.interview_complete = False
+        question = get_random_question(api_key, new_subject)
+        if question:
+            st.session_state.messages.append(f"Q: {question}")
+            st.rerun()
+else:
+    st.session_state.context_focus = None
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Initialize tabs
+tab1, tab2, tab3 = st.tabs(["Interview", "Context Review", "How it Works"])
 
 with tab1:
-    # Control buttons at the top
     col1, col2, col3 = st.columns(3)
+    
     with col1:
-        if st.button("Start New Interview", key="start_new", use_container_width=True):
+        if st.button("Start New Interview", use_container_width=True):
             st.session_state.messages = []
             st.session_state.context_data = ""
             st.session_state.interview_started = True
@@ -306,14 +374,14 @@ with tab1:
                 st.error("Failed to generate question. Please check your API key.")
 
     with col2:
-        if st.button("End Interview", key="end", use_container_width=True):
+        if st.button("End Interview", use_container_width=True):
             if st.session_state.messages:
                 st.session_state.interview_complete = True
                 st.session_state.context_data = extract_context(api_key, st.session_state.messages)
                 st.rerun()
 
     with col3:
-        if st.button("Export Conversation", key="export", use_container_width=True):
+        if st.button("Export Conversation", use_container_width=True):
             if st.session_state.messages:
                 filename = generate_markdown_filename(st.session_state.context_focus)
                 st.download_button(
@@ -324,15 +392,12 @@ with tab1:
                     use_container_width=True
                 )
 
-    # Chat messages
-    for msg in st.session_state.messages:
-        is_bot = msg.startswith('Q:')
-        if is_bot:
-            with st.chat_message("assistant", avatar="🤖"):
-                st.write(msg[2:])  # Remove the 'Q: ' prefix
+    # Display chat messages
+    for i, message in enumerate(st.session_state.messages):
+        if message.startswith("Q: "):
+            display_chat_message(message[3:], is_user=False)
         else:
-            with st.chat_message("user", avatar="👤"):
-                st.write(msg)
+            display_chat_message(message, is_user=True)
 
     # Input area
     if api_key and st.session_state.interview_started and not st.session_state.interview_complete:
@@ -346,17 +411,6 @@ with tab1:
                 st.rerun()
             else:
                 st.error("Failed to generate question. Please check your API key.")
-
-with tab4:
-    st.header("Feature Gallery")
-    st.markdown("### Interactive Interview Process")
-    st.image("screenshots/1.png", use_container_width=True)
-    st.write("")
-    st.markdown("### Context Focus Selection")
-    st.image("screenshots/2.png", use_container_width=True)
-    st.write("")
-    st.markdown("### Generated Context Summary")
-    st.image("screenshots/3.png", use_container_width=True)
 
 with tab2:
     if st.session_state.interview_complete and st.session_state.context_data:
